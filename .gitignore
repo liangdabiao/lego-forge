@@ -5,3 +5,6 @@ sets/*/out/view.png
 .DS_Store
 sets/*
 !sets/.gitkeep
+
+# local scratch: slice dumps, previews, one-off experiments
+.workbuddy/tmp/
