@@ -1,0 +1,4 @@
+# keep the published skill byte-identical on every platform
+skills/**/*.py   text eol=lf
+skills/**/*.mjs  text eol=lf
+skills/**/*.md   text eol=lf
