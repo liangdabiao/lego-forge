@@ -82,6 +82,34 @@ python <skill>/scripts/preview.py --vol <work>/volume.json --outdir <work>
 归并的语义是"**每个区域**统一成该区域的主色"——成片的暗红阴影会保留（那是真实的明暗分区），
 只有碎条纹被并掉。所以红袍变干净，但层次不丢。
 
+## 缩放：要小一号就归并，不要降层数重切
+
+用户说"缩小一半"指的是**成品的一半高**，也就是层数从 128 变 64。但**不要**用 `--courses 64` 重切：
+
+| 做法 | 代价 |
+|---|---|
+| `--courses 64` 重切 | 重新走 2M 面 × 7 点采样 + 全量排序，峰值 1.2 GB 以上。本机页面文件被关闭（可提交内存 = 物理内存），空闲剩 1.2 GB 时连 17 MB 都分配不出来：`ArrayMemoryError` 或 OpenBLAS `Memory allocation still failed` |
+| **`downscale.py` 归并** ✅ | 只读已验收的 volume.json，2 秒、几十 MB、输出确定性；`--factor 2` = 每个方向减半 |
+
+```bash
+python <skill>/scripts/downscale.py --src <work>/volume.json --out <work>_half/volume.json
+python <skill>/scripts/preview.py --vol <work>_half/volume.json --outdir <work>_half --px 8 --floors 4
+```
+
+规则：**先按 128 层切细，再归并**。反过来（先切 64 层）表面更糙，而且内存一样要花。
+
+实测（鹿 01-creature，`--factor 2`）：
+
+| | 128 层 | 减半后 |
+|---|---|---|
+| 网格 | 95 × 128 × 73 | 48 × 64 × 37 |
+| 体素 | 69,826 | 10,809 |
+| 件数 | 22,689 | 5,055 |
+| 未连接 | 74 | 39 |
+
+**必须主动说明的损失**：1 格宽的细结构（鹿角尖、细腿、手指、衣带）归并后会变粗或断开。
+归并的定色规则是"2×2×2 块里出现次数最多的颜色"，不做插值——插值会造出模型里没有的颜色。
+
 第 2 步的验收标准（看 `view_front.png` / `view_side.png` / `layers.png`）：
 
 - 正视图轮廓与模型一致，**不是**一根根竖直的柱子；
@@ -122,6 +150,7 @@ python <skill>/scripts/preview.py --vol <work>/volume.json --outdir <work>
 - `scripts/vox.py` — 切片主程序（`--ball` 出验证球）
 - `scripts/probe.py` — 体检：`--stats` 颜色分布 / `--layers A:B --cols C:D` 正面 ASCII 色图 / `--profile 列,层` 深度剖面
 - `scripts/preview.py` — 三视图 + 分层图
+- `scripts/downscale.py` — 尺寸缩放：`--factor 2` 即一半（见上文「缩放」一节）
 - `scripts/build.mjs` — 装配模板（拷到 volume.json 同目录，只改 title）
 
 排查顺序建议：`probe.py --stats` → `--layers/--cols` 看特征在不在 → `--profile` 看是不是被挡住 →
